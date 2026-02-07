@@ -1,4 +1,23 @@
-; Axiom 128-bit Test Program
+;++
+;
+; FACILITY:
+;
+;	Assembler test program for AURORA
+;
+; ABSTRACT:
+;
+;	This is a test 128-bit program for the AUR128 architecture. It
+;	utilizes the new instructions like CLZ, SYSCALL and CAS.
+;
+; AUTHOR:
+;
+;	Mayank Pathak	7 February 2026
+;
+; REVISION HISTORY:
+;
+;
+;--
+
 START:
     ADDI R1, R0, 0x500
     ADDI R2, R0, 0
