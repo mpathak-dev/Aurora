@@ -1,0 +1,64 @@
+!++
+!
+! FACILITY:  AURORA BLISS Compiler Test
+!
+! ABSTRACT:
+!
+!  This is a test program for the AURORA BLISS compiler. It outputs the character
+!  A to the screen and exits.
+!
+!--
+!
+! AUTHOR:  Mayank Pathak,  CREATION DATE:  6-Feb-2026
+!
+! REVISION HISTORY:
+!
+!
+!**
+
+MODULE EXAMPLE (MAIN = STARTUP) =
+BEGIN
+
+!++
+!
+! Function description:
+!
+!	This routine displays a single 'A' character to the
+!	available text mode video graphics screen terminal.
+!
+! Inputs:
+!
+!	None.
+!
+! Outputs:
+!
+!	None.
+!
+!--
+
+ROUTINE DISPLCHAR =
+BEGIN
+
+	!
+	! Address 0x400 contains the screen buffer. We write 0x41
+	! (ASCII for 'A') to it directly.
+	!
+	
+    %X'400' = %X'41';
+    
+    RETURN 1;
+END;
+
+ROUTINE STARTUP =
+BEGIN
+	!
+	! Call the routine and exit. 
+	!
+	
+    DISPLCHAR();
+    
+    RETURN 1;
+END;
+
+END
+ELUDOM
