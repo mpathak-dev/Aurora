@@ -35,6 +35,10 @@ Revision History:
 #define OP_HALT  8
 #define OP_CALL  9
 #define OP_RET   10
+#define OP_RETI    11
+#define OP_SYSCALL 12
+#define OP_CLZ     14
+#define OP_CAS     16
 
 #define MAX_LABELS 1024
 #define MAX_LINES  4096
@@ -199,60 +203,58 @@ uint32_t assemble_line(char *line, uint32_t current_address)
     char b[32] = {0};
     char c[32] = {0};
 
+    // Note: sscanf might fail for zero-argument ops like SYSCALL, 
+    // so we check the opcode string first.
     sscanf(line, "%s %[^,], %[^,], %s", op, a, b, c);
 
     for (int i = 0; op[i]; i++)
         op[i] = toupper(op[i]);
 
+    // --- New System Opcodes ---
+
+    if (strcmp(op, "SYSCALL") == 0)
+        return encode_j(OP_SYSCALL, 0);
+
+    if (strcmp(op, "RETI") == 0)
+        return encode_j(OP_RETI, 0);
+
+    if (strcmp(op, "CLZ") == 0)
+        // Format: CLZ Rd, Rs1
+        return encode_r(OP_CLZ, parse_register(a), parse_register(b), 0);
+
+    if (strcmp(op, "CAS") == 0)
+        // Format: CAS Rd, Rs1, Rs2 
+        // (If [Rs1] == Rs2, then [Rs1] = Rd)
+        return encode_r(OP_CAS, parse_register(a), parse_register(b), parse_register(c));
+
+    // --- Original Opcodes ---
+
     if (strcmp(op, "ADD") == 0)
-        return encode_r(OP_ADD,
-            parse_register(a),
-            parse_register(b),
-            parse_register(c));
+        return encode_r(OP_ADD, parse_register(a), parse_register(b), parse_register(c));
 
     if (strcmp(op, "SUB") == 0)
-        return encode_r(OP_SUB,
-            parse_register(a),
-            parse_register(b),
-            parse_register(c));
+        return encode_r(OP_SUB, parse_register(a), parse_register(b), parse_register(c));
 
     if (strcmp(op, "ADDI") == 0)
-        return encode_i(OP_ADDI,
-            parse_register(a),
-            parse_register(b),
-            strtol(c, NULL, 0));
+        return encode_i(OP_ADDI, parse_register(a), parse_register(b), strtol(c, NULL, 0));
 
     if (strcmp(op, "LOAD") == 0)
-        return encode_i(OP_LOAD,
-            parse_register(a),
-            parse_register(b),
-            strtol(c, NULL, 0));
+        return encode_i(OP_LOAD, parse_register(a), parse_register(b), strtol(c, NULL, 0));
 
     if (strcmp(op, "STORE") == 0)
-        return encode_i(OP_STORE,
-            parse_register(a),
-            parse_register(b),
-            strtol(c, NULL, 0));
+        return encode_i(OP_STORE, parse_register(a), parse_register(b), strtol(c, NULL, 0));
 
-	if (strcmp(op, "BEQ") == 0)
-	{
-	    uint32_t target = parse_address(c);
-
-	    int32_t offset = ((int32_t)target - (int32_t)(current_address + 4)) / 4;
-
-	    return encode_i(OP_BEQ,
-	        parse_register(a),
-	        parse_register(b),
-	        offset);
-	}
+    if (strcmp(op, "BEQ") == 0) {
+        uint32_t target = parse_address(c);
+        int32_t offset = ((int32_t)target - (int32_t)(current_address + 4)) / 4;
+        return encode_i(OP_BEQ, parse_register(a), parse_register(b), offset);
+    }
 
     if (strcmp(op, "JMP") == 0)
-        return encode_j(OP_JMP,
-            parse_address(a));
+        return encode_j(OP_JMP, parse_address(a));
 
     if (strcmp(op, "CALL") == 0)
-        return encode_j(OP_CALL,
-            parse_address(a));
+        return encode_j(OP_CALL, parse_address(a));
 
     if (strcmp(op, "RET") == 0)
         return encode_j(OP_RET, 0);

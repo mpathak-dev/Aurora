@@ -137,9 +137,12 @@ Return Value:
         case OP_SUB:
             Processor->R[Rd] = PiSub128(Processor->R[Rs1], Processor->R[Rs2]);
             break;
-        case OP_ADDI:
-            Processor->R[Rd].Low += Imm;
+        case OP_ADDI: {
+			UINT128 imm128 = { (UINT)Imm, (Imm < 0) ? 0xFFFFFFFF : 0, 
+                               (Imm < 0) ? 0xFFFFFFFF : 0, (Imm < 0) ? 0xFFFFFFFF : 0 };
+            Processor->R[Rd] = PiAdd128(Processor->R[Rs1], imm128);
             break;
+        }
         case OP_LOAD:
             Processor->R[Rd] = PmRead128(Processor, Processor->R[Rs1].Low + Imm);
             break;
@@ -166,6 +169,43 @@ Return Value:
         case OP_RETI:
             Processor->PC = Processor->R[30];
             break;
+
+		case OP_CLZ: {
+            // Count leading zeros in the 128-bit register (High to Low)
+            // Essential for high-speed interrupt and priority scheduling
+            UINT count = 0;
+            UINT128 val = Processor->R[Rs1];
+            UINT parts[4] = { val.High, val.MidHigh, val.MidLow, val.Low };
+            
+            for (int i = 0; i < 4; i++) {
+                if (parts[i] == 0) count += 32;
+                else {
+                    UINT temp = parts[i];
+                    while (!(temp & 0x80000000)) { temp <<= 1; count++; }
+                    break;
+                }
+            }
+            Processor->R[Rd] = (UINT128){ count, 0, 0, 0 };
+            break;
+        }
+
+        case OP_CAS: {
+            // Atomic Compare and Swap: If [Rs1] == Rs2, then [Rs1] = Rd.
+            // Returns original value in Rd for lock-check logic.
+            UINT128 currentVal = PmRead128(Processor, Processor->R[Rs1].Low);
+            if (currentVal.Low == Processor->R[Rs2].Low && 
+                currentVal.High == Processor->R[Rs2].High) { // Simplified 64-bit check
+                PmWrite128(Processor, Processor->R[Rs1].Low, Processor->R[Rd]);
+            }
+            Processor->R[Rd] = currentVal; 
+            break;
+        }
+
+        case OP_SYSCALL:
+            // Trigger Software Interrupt 2 (System Service)
+            PiTriggerInterrupt(Processor, INT_SOFTWARE);
+            break;
+        
         default:
             printf("INVALID OPCODE %u\n", Opcode);
             PiTriggerInterrupt(Processor, INT_INVALID);

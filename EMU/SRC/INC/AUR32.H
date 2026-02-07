@@ -131,7 +131,16 @@ enum
     OP_HALT = 8,
     OP_CALL = 9,
     OP_RET = 10,
-	OP_RETI = 11
+	OP_RETI = 11,
+	OP_SYSCALL = 12, // User -> Kernel transition
+    OP_RFE     = 13, // Return from Exception (Privilege switch)
+    OP_CLZ     = 14, // Count Leading Zeros (for IRQ scanning)
+    OP_AMO_ADD = 15, // Atomic Add (for shared counters)
+    OP_CAS     = 16, // Compare and Swap (for Mutexes)
+    OP_MOV128  = 17, // Move 128-bit reg to reg
+    OP_SRL     = 18, // Logical Shift Right (Crucial for 128-bit math)
+    OP_SLL     = 19, // Logical Shift Left
+    OP_INT     = 20  // Software Interrupt (Force a specific vector)
 };
 
 typedef struct LOADER_BLOCK
