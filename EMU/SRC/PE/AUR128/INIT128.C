@@ -89,14 +89,14 @@ Return Value:
 
         //
         // Initialize vector instructions:
-        // INT_INVALID -> HALT, others -> NOP
+        // INT_INVALID -> HALT, others -> RETI
         //
 
         UINT instr;
         if(i == INT_INVALID) {
             instr = (OP_HALT << 26);
         } else {
-            instr = (OP_NOP << 26);
+            instr = (OP_RETI << 26);
         }
 
         *(UINT *)(Processor->Memory + VECTOR_BASE + i * VECTOR_SIZE) = instr;

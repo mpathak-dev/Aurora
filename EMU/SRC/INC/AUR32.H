@@ -109,6 +109,7 @@ enum
     INT_SOFTWARE   = 2,
     INT_MEMORY     = 3,
 	INT_DISK	   = 4,
+	INT_POINTER    = 5,
 	INT_INVALID    = 15
 };
 

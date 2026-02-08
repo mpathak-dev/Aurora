@@ -94,6 +94,9 @@ Return Value:
 {
     PCPU128 Processor = UProcessor->Aur128;
 
+    // UINT reti_instr = (OP_RETI << 26); 
+    // PmWrite32(UProcessor, 0xF008, reti_instr);
+
     UINT Instruction = PmRead32(UProcessor, Processor->PC.Low);
     Processor->PC.Low += 4;
 
@@ -137,12 +140,17 @@ Return Value:
         case OP_SUB:
             Processor->R[Rd] = PiSub128(Processor->R[Rs1], Processor->R[Rs2]);
             break;
-        case OP_ADDI: {
-			UINT128 imm128 = { (UINT)Imm, (Imm < 0) ? 0xFFFFFFFF : 0, 
-                               (Imm < 0) ? 0xFFFFFFFF : 0, (Imm < 0) ? 0xFFFFFFFF : 0 };
-            Processor->R[Rd] = PiAdd128(Processor->R[Rs1], imm128);
-            break;
-        }
+		case OP_ADDI: {
+		    UINT128 imm128 = {
+		        (UINT)(uint16_t)Imm,
+		        0,
+		        0,
+		        0
+		    };
+
+		    Processor->R[Rd] = PiAdd128(Processor->R[Rs1], imm128);
+		    break;
+		}
         case OP_LOAD:
             Processor->R[Rd] = PmRead128(Processor, Processor->R[Rs1].Low + Imm);
             break;
@@ -189,12 +197,14 @@ Return Value:
             break;
         }
 
-        case OP_CAS: {
-            // Atomic Compare and Swap: If [Rs1] == Rs2, then [Rs1] = Rd.
-            // Returns original value in Rd for lock-check logic.
+		case OP_CAS: {
+            // Atomic Compare and Swap (Full 128-bit check)
             UINT128 currentVal = PmRead128(Processor, Processor->R[Rs1].Low);
-            if (currentVal.Low == Processor->R[Rs2].Low && 
-                currentVal.High == Processor->R[Rs2].High) { // Simplified 64-bit check
+            if (currentVal.Low      == Processor->R[Rs2].Low && 
+                currentVal.MidLow   == Processor->R[Rs2].MidLow &&
+                currentVal.MidHigh  == Processor->R[Rs2].MidHigh &&
+                currentVal.High     == Processor->R[Rs2].High) 
+            {
                 PmWrite128(Processor, Processor->R[Rs1].Low, Processor->R[Rd]);
             }
             Processor->R[Rd] = currentVal; 
@@ -204,6 +214,67 @@ Return Value:
         case OP_SYSCALL:
             // Trigger Software Interrupt 2 (System Service)
             PiTriggerInterrupt(Processor, INT_SOFTWARE);
+            break;
+
+		case OP_INT:
+			PiTriggerInterrupt(Processor, Rd);
+			break;
+
+		case OP_MOV128:
+			Processor->R[Rd] = Processor->R[Rs1];
+			break;
+
+		case OP_SLL: {
+			UINT Shift = Processor->R[Rs2].Low & 0x7F;
+			for (UINT i = 0; i<Shift; i++) {
+				UINT c1 = (Processor->R[Rd].Low & 0x80000000) ? 1 : 0;
+                UINT c2 = (Processor->R[Rd].MidLow & 0x80000000) ? 1 : 0;
+                UINT c3 = (Processor->R[Rd].MidHigh & 0x80000000) ? 1 : 0;
+
+                Processor->R[Rd].Low <<= 1;
+                Processor->R[Rd].MidLow = (Processor->R[Rd].MidLow << 1) | c1;
+                Processor->R[Rd].MidHigh = (Processor->R[Rd].MidHigh << 1) | c2;
+                Processor->R[Rd].High = (Processor->R[Rd].High << 1) | c3;
+			}
+			break;
+		}
+
+		case OP_SRL: {
+			UINT shift = Processor->R[Rs2].Low & 0x7F;
+            for (UINT i = 0; i < shift; i++) {
+                UINT c1 = (Processor->R[Rd].High & 1) ? 0x80000000 : 0;
+                UINT c2 = (Processor->R[Rd].MidHigh & 1) ? 0x80000000 : 0;
+                UINT c3 = (Processor->R[Rd].MidLow & 1) ? 0x80000000 : 0;
+
+                Processor->R[Rd].High >>= 1;
+                Processor->R[Rd].MidHigh = (Processor->R[Rd].MidHigh >> 1) | c1;
+                Processor->R[Rd].MidLow = (Processor->R[Rd].MidLow >> 1) | c2;
+                Processor->R[Rd].Low = (Processor->R[Rd].Low >> 1) | c3;
+            }
+			break;
+		}
+
+		case OP_AMO_ADD: {
+            // Atomic Memory Add: 
+            // Read original value from [Rs1]
+            // Add Rs2 to it
+            // Store result back to [Rs1]
+            // Rd receives the ORIGINAL value (for synchronization logic)
+            
+            UINT128 originalVal = PmRead128(Processor, Processor->R[Rs1].Low);
+            UINT128 newVal = PiAdd128(originalVal, Processor->R[Rs2]);
+            
+            PmWrite128(Processor, Processor->R[Rs1].Low, newVal);
+            
+            Processor->R[Rd] = originalVal;
+            break;
+        }
+
+        case OP_RFE:
+            // Return From Exception / Privilege Switch
+            // Restores PC from R30 and re-enables Interrupts
+            Processor->PC = Processor->R[30];
+            Processor->IE = 1; 
             break;
         
         default:
